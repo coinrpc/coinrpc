@@ -1,0 +1,15 @@
+{
+    "name": "coinrpc/coinrpc",
+    "description": "Client to communicate with Bitcoind style RPC servers",
+    "keywords": ["bitcoin", "litecoin", "namecoin", "dogecoin"],
+    "homepage": "http://github.com/coinrpc/coinrpc",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-0": {"CoinRpc\\": ""}
+    },
+    "require": {
+        "php": ">=5.3.3",
+        "guzzle/guzzle": "~3.4"
+    }
+}

@@ -122,7 +122,7 @@ abstract class AbstractClient
         try {
             $request = $client->post('/', [
                     RequestOptions::HEADERS => ['Content-type' => 'application/json'],
-                    RequestOptions::BODY => json_encode($payload),
+                    RequestOptions::JSON => $payload,
                 ]
             );
 

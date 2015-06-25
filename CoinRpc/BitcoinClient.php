@@ -8,7 +8,7 @@
 
 namespace CoinRpc;
 
-use Guzzle\Http\Client;
+use GuzzleHttp\Client;
 
 /**
  * Class BitcoinClient

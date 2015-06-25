@@ -8,7 +8,10 @@
 
 namespace CoinRpc;
 
-use Guzzle\Http\Client;
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\ClientException;
+use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\RequestOptions;
 
 /**
  * Class AbstractClient
@@ -24,6 +27,16 @@ abstract class AbstractClient
     private $url;
 
     /**
+     * @var array
+     */
+    private $auth;
+
+    /**
+     * @var array
+     */
+    private $ssl = [];
+
+    /**
      * @var Client
      */
     private $client;
@@ -37,42 +50,31 @@ abstract class AbstractClient
      *
      * Typical URL would be something like:
      *
-     *    http://rpc_username:rpc_password@localhost:8332
-     *
      * @param string $url
+     * @param array  $auth   [user, pass]
      * @param Client $client Optional pre-configured client
      */
-    public function __construct($url, Client $client = null)
+    public function __construct($url, array $auth = [], Client $client = null)
     {
         $this->url = $url;
+        $this->auth = $auth;
         $this->client = $client;
     }
 
     /**
      * Setup SSL verification.
      *
-     * Setting $certificateAuthority to TRUE will result in the bundled
-     * with Guzzle's cacert.pem being used to verify against the remote host.
-     *
-     * Alternate certificates to verify against can be specified with the
-     * $certificateAuthority option set to a certificate file location to be
-     * used with CURLOPT_CAINFO, or a certificate directory path to be used
-     * with the CURLOPT_CAPATH option.
-     *
-     * Setting $certificateAuthority to FALSE will turn off peer verification,
-     * unset the bundled cacert.pem, and disable host verification. Please
-     * don't do this unless you really know what you're doing, and why
-     * you're doing it.
-     *
-     * @param string|bool $certificateAuthority bool, file path, or directory path
-     * @param bool        $verifyPeer           FALSE to stop cURL from verifying the peer's certificate.
-     * @param int         $verifyHost           Set the cURL handle's CURLOPT_SSL_VERIFYHOST option
+     * @param boolean|string $verify
+     * @param string|array   $cert
+     * @param string|array   $sslKey
      */
-    public function setSslVerification($certificateAuthority = true, $verifyPeer = true, $verifyHost = 2)
+    public function setSslVerification($verify = false, $cert = null, $sslKey = null)
     {
-        $this->certificateAuthority = $certificateAuthority;
-        $this->verifyPeer = $verifyPeer;
-        $this->verifyHost = $verifyHost;
+        $this->ssl = [
+            RequestOptions::VERIFY => $verify,
+            RequestOptions::CERT => $cert,
+            RequestOptions::SSL_KEY => $sslKey,
+        ];
     }
 
     /**
@@ -112,22 +114,31 @@ abstract class AbstractClient
         if ($this->client) {
             $client = $this->client;
         } else {
-            $client = new Client($this->url);
-            $client->setSslVerification($this->certificateAuthority, $this->verifyPeer, $this->verifyHost);
+            $config = ['base_uri' => $this->url, RequestOptions::AUTH => $this->auth];
+            $config = array_merge($this->ssl, $config);
+            $client = new Client($config);
         }
 
-        $request = $client->post('/', null, json_encode($payload));
-        $request->addHeader('Content-type', 'application/json');
         try {
-            $response = $request->send();
-        } catch (\Exception $e) {
-            $response = $request->getResponse();
-            if (null === $response) {
+            $request = $client->post('/', [
+                    RequestOptions::HEADERS => ['Content-type' => 'application/json'],
+                    RequestOptions::BODY => json_encode($payload),
+                ]
+            );
+
+            $response = $request->getBody();
+            $response = json_decode($response->getContents(), true);
+        } catch (ConnectException $e) {
+            throw $e;
+        } catch (ClientException $e) {
+            $response = $e->getResponse();
+            $code = $response->getStatusCode();
+            if ($code == 401) {
+                $response = json_decode($response->getBody(), true);
+            } else {
                 throw $e;
             }
         }
-
-        $response = $response->json();
 
         if (!$this->notification) {
             if ($currentId != $response['id']) {

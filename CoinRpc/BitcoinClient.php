@@ -641,6 +641,8 @@ class BitcoinClient extends AbstractClient
         $args = array();
         if (null !== $account) {
             $args[] = $account;
+        } else {
+            $args[] = '*';
         }
 
         if (null !== $count) {
